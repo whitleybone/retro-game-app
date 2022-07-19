@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
-import PlaySound from "./components/PlaySound.js";
+import PlaySound from "./Components/PlaySound.js";
 
 function App() {
   // Properties
@@ -8,6 +8,32 @@ function App() {
   const [showFinalResults, setFinalResults] = useState(false);
   const [score, setScore] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
+
+  //Question Color
+  const [questionColor, setQuestionColor] = useState(false);
+
+  const [colorForMultiple, setcolorForMultiple] = useState(false);
+
+  //Correct Answer ID
+  const [answerID, setAnswerID] = useState(0);
+
+  //cursor
+  const [cursor, setCursor] = useState(0);
+
+  //Correct answers
+  const successMessage = useRef();
+
+  //Tab click
+  const [indexOfTab, setIndexOfTab] = useState(0);
+
+  const [onKeyPressing, setOnKeyPress] = useState(false);
+
+  // useEffect for setting color for multiple answers
+
+  useEffect(() => {
+    setcolorForMultiple(false);
+  }, [showFinalResults]);
+
   const questions = [
     {
       text: "Mario first appeared in what classic game?",
@@ -20,7 +46,7 @@ function App() {
     },
     {
       text:
-        "What inspired game maker Satoshi Tajiri to create the character Pokemon?",
+        "What creature inspired game maker Satoshi Tajiri to create Pokemon?",
       options: [
         { id: 0, text: "Butterflies", isCorrect: true },
         { id: 1, text: "Caterpillars", isCorrect: false },
@@ -39,7 +65,7 @@ function App() {
       ]
     },
     {
-      text: "How many worlds are there in Super Mario Bros 3",
+      text: "How many worlds are there in Super Mario Bros 3?",
       options: [
         { id: 0, text: "5", isCorrect: false },
         { id: 1, text: "7", isCorrect: false },
@@ -61,22 +87,113 @@ function App() {
 
   // Helper Functions.
 
-  const optionClicked = (isCorrect) => {
-    if (isCorrect) {
-      setScore(score + 1);
+  const optionClicked = (isCorrect, optionID) => {
+    setAnswerID(optionID);
+    // console.log("Hey iD before", optionID);
+
+    let multipleAnswers = 0;
+    let correctAnswers = 0;
+
+    for (let i = 0; i < questions[currentQuestion].options.length; i++) {
+      if (questions[currentQuestion].options[i].isCorrect === true) {
+        multipleAnswers++;
+      }
     }
 
-    if (currentQuestion + 1 < questions.length) {
-      setCurrentQuestion(currentQuestion + 1);
+    if (multipleAnswers === 2) {
+      setcolorForMultiple(true);
+      correctAnswers = correctAnswers + 2;
     } else {
-      setFinalResults(true);
+      correctAnswers = correctAnswers + 1;
+    }
+
+    if (correctAnswers === 1) {
+      setQuestionColor(true);
+
+      setTimeout(() => {
+        if (isCorrect) {
+          setScore(score + 1);
+        }
+
+        if (currentQuestion + 1 < questions.length) {
+          setCurrentQuestion(currentQuestion + 1);
+        } else {
+          setFinalResults(true);
+        }
+        setOnKeyPress(false);
+        setQuestionColor(false);
+      }, 2000);
+    } else if (correctAnswers === 2 && colorForMultiple === true) {
+      setQuestionColor(true);
+      setTimeout(() => {
+        if (isCorrect) {
+          setScore(score + 1);
+        }
+
+        if (currentQuestion + 1 < questions.length) {
+          setCurrentQuestion(currentQuestion + 1);
+        } else {
+          setFinalResults(true);
+        }
+        setOnKeyPress(false);
+        setQuestionColor(false);
+      }, 2000);
+    } else {
+      console.log("onKeyPressing", onKeyPressing);
+      setOnKeyPress(false);
+
+      // alert("Please select multiple answers.", onKeyPressing);
     }
   };
+
   const restartGame = () => {
     setScore(0);
     setCurrentQuestion(0);
     setFinalResults(false);
   };
+
+  //Keyboard Accessibility
+
+  const keyHandler = (isCorrect, optionID) => {
+    // setIndexOfTab(indexOfTab + 1);
+    console.log("onFocusHandler", indexOfTab);
+    optionClicked(isCorrect, optionID);
+    console.log("ArrowUp", isCorrect, optionID);
+  };
+
+  useEffect(() => {
+    const listener = (e) => {
+      e.preventDefault();
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Enter") {
+        e.preventDefault();
+        keyHandler2(e);
+      }
+    };
+    document.addEventListener("keydown", listener);
+    return () => {
+      document.removeEventListener("keydown", listener);
+    };
+  }, [cursor]);
+
+  // console.log("cursor value:", cursor);
+
+  const keyHandler2 = (e) => {
+    console.log("cursor value:", cursor);
+
+    if (e.key === "ArrowUp" && cursor > 0) {
+      setCursor(cursor - 1);
+    } else if (
+      e.key === "ArrowDown" &&
+      cursor < questions[currentQuestion].options.length - 1
+    ) {
+      setCursor(cursor + 1);
+    } else if (e.key === "Enter") {
+      setOnKeyPress(true);
+      console.log("\nSetting keyPress == True", onKeyPressing);
+    }
+  };
+
+  // --------------------------------------------------
 
   return (
     <div className="App">
@@ -109,6 +226,9 @@ function App() {
         <div className="quiz-card">
           <header>
             <h1>Retro Gaming Quiz</h1>
+            <h4>
+              <em>Use your mouse or arrow/enter keys</em>
+            </h4>
             <h2>Current Score: {score}</h2>
           </header>
           <section>
@@ -116,29 +236,64 @@ function App() {
               Question {currentQuestion + 1} out of {questions.length}
             </h2>
             <h3 className="question-text">{questions[currentQuestion].text}</h3>
-            <ul>
-              {questions[currentQuestion].options.map((option) => {
-                return (
-                  <li
-                    onClick={() => optionClicked(option.isCorrect)}
-                    key={option.id}
-                  >
-                    {option.text}
-                  </li>
+
+            <ul ref={successMessage}>
+              {questions[currentQuestion].options.map((option, i) => {
+                return questionColor ? (
+                  <>
+                    <li
+                      onClick={() => optionClicked(option.isCorrect, option.id)}
+                      key={option.id}
+                      className={
+                        option.isCorrect === true ? "isGreen" : "isRed"
+                      }
+                    >
+                      {option.text}
+                    </li>
+                  </>
+                ) : colorForMultiple ? (
+                  <>
+                    <li
+                      onClick={() => optionClicked(option.isCorrect, option.id)}
+                      key={option.id}
+                      className={
+                        option.id === answerID
+                          ? "selectedAnswer"
+                          : "" || cursor === i
+                          ? "active"
+                          : null
+                      }
+                    >
+                      {option.text}
+                      {/* {cursor === i && keyHandler(option.isCorrect, option.id)} */}
+                    </li>
+                  </>
+                ) : onKeyPressing ? (
+                  <>{cursor === i && keyHandler(option.isCorrect, option.id)}</>
+                ) : (
+                  <>
+                    <li
+                      onClick={() => optionClicked(option.isCorrect, option.id)}
+                      key={option.id}
+                      className={cursor === i ? "active" : null}
+                    >
+                      {option.text}
+                    </li>
+                  </>
                 );
               })}
             </ul>
           </section>
         </div>
       )}
-      <section>
+      <div>
         <div className="play-sound">
           <PlaySound
             url="https://www.vgmsite.com/soundtracks/super-mario-bros/jlgsgtpeof/01%20Running%20About.mp3"
             label="SuperMario"
           />
         </div>
-      </section>
+      </div>
     </div>
   );
 }
